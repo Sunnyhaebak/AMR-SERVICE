@@ -36,6 +36,13 @@ export class TicketsController {
     return this.ticketsService.findAll({ state, managerId, engineerId, page, limit });
   }
 
+  // MUST be before :id route
+  @Roles('ENGINEER')
+  @Get('engineer/rejected')
+  getRejectedTickets(@CurrentUser() user: AuthenticatedUser) {
+    return this.ticketsService.getEngineerRejectedTickets(user.id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ticketsService.findOne(id);
@@ -81,11 +88,5 @@ export class TicketsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.ticketsService.complete(id, user.id, dto);
-  }
-
-  @Roles('ENGINEER')
-  @Get('engineer/rejected')
-  getRejectedTickets(@CurrentUser() user: AuthenticatedUser) {
-    return this.ticketsService.getEngineerRejectedTickets(user.id);
   }
 }

@@ -172,6 +172,7 @@ function UserFormDrawer({ open, onClose, user }: { open: boolean; onClose: () =>
   const { data: managers = [] } = useQuery<User[]>({
     queryKey: ['managers-list'],
     queryFn: () => api.get('/users', { params: { role: 'MANAGER' } }).then((r) => r.data),
+    enabled: open && form.roles.includes('ENGINEER'),
   });
 
   const createMutation = useMutation({

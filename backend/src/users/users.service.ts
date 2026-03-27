@@ -18,6 +18,36 @@ export class UsersService {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
+
+    // If user was soft-deleted, restore them with new data
+    if (existing && existing.isDeleted) {
+      const passwordHash = await bcrypt.hash(dto.password, 12);
+      const restored = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: dto.name,
+          passwordHash,
+          roles: dto.roles,
+          managerId: dto.managerId ?? null,
+          defaultLandingPage: dto.defaultLandingPage,
+          pageAccess: dto.pageAccess ? (dto.pageAccess as any) : null,
+          isDeleted: false,
+          isLocked: false,
+        },
+      });
+
+      await this.audit.log({
+        userId: actorId,
+        action: 'RESTORE_USER',
+        entityType: 'User',
+        entityId: restored.id,
+        newState: JSON.stringify({ roles: restored.roles }),
+      });
+
+      const { passwordHash: _, ...result } = restored;
+      return result;
+    }
+
     if (existing) throw new ConflictException('Email already in use');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);

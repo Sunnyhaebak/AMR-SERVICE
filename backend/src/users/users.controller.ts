@@ -30,6 +30,13 @@ export class UsersController {
     return this.usersService.findAll({ role, search });
   }
 
+  // MUST be before :id route so "manager" doesn't get matched as an id param
+  @Roles('MANAGER')
+  @Get('manager/engineers')
+  getMyEngineers(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.getEngineersForManager(user.id);
+  }
+
   @Roles('ADMIN')
   @Get(':id')
   findOne(@Param('id') id: string) {
@@ -50,11 +57,5 @@ export class UsersController {
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.usersService.softDelete(id, user.id);
-  }
-
-  @Roles('MANAGER')
-  @Get('manager/engineers')
-  getMyEngineers(@CurrentUser() user: AuthenticatedUser) {
-    return this.usersService.getEngineersForManager(user.id);
   }
 }
