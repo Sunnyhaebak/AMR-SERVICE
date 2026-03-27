@@ -6,7 +6,7 @@ import Drawer from '../../components/ui/Drawer';
 import Modal from '../../components/ui/Modal';
 import StatusChip from '../../components/ui/StatusChip';
 import toast from 'react-hot-toast';
-import type { SmrRequest, SmrState, Site } from '../../types';
+import type { SmrRequest, Site } from '../../types';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const TABS = [
