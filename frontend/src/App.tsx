@@ -22,9 +22,10 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore.persist.hasHydrated();
 
   const getDefaultRoute = () => {
-    if (!user) return '/login';
+    if (!hasHydrated || !user) return '/login';
     if (user.roles.includes('ADMIN')) return '/admin/users';
     if (user.roles.includes('MANAGER')) return '/manager/attendance';
     if (user.roles.includes('ENGINEER')) return '/engineer/tickets';
