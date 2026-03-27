@@ -17,18 +17,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    // Only force logout if:
-    // 1. It's a real 401 response (not a network error)
-    // 2. It's NOT the login endpoint itself
-    // 3. We actually have a token (meaning we were logged in)
-    if (
-      error.response?.status === 401 &&
-      !error.config?.url?.includes('/auth/login') &&
-      useAuthStore.getState().token
-    ) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
-    }
+    // Log for debugging
+    console.error('[API Error]', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
+
+    // NEVER auto-logout. Let individual pages handle auth errors.
+    // The ProtectedRoute already handles the case where there's no token.
     return Promise.reject(error);
   },
 );
