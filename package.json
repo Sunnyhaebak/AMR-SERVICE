@@ -1,0 +1,23 @@
+{
+  "name": "amr-service-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AMR Service Management Platform — Backend + Frontend",
+  "scripts": {
+    "dev": "concurrently -n db,backend,frontend -c yellow,blue,green \"npm run db:up\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:no-db": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run start --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "db:up": "docker compose up",
+    "db:down": "docker compose down",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "setup": "npm run db:up -- -d && sleep 3 && npm run prisma:migrate && npm run prisma:seed",
+    "prisma:migrate": "npm run prisma:migrate --prefix backend",
+    "prisma:seed": "npm run prisma:seed --prefix backend",
+    "prisma:generate": "npm run prisma:generate --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

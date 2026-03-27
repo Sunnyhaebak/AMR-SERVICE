@@ -1,0 +1,291 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  ENGINEER
+}
+
+enum AttendanceState {
+  PLANNED
+  PRESENT
+  ABSENT
+  OVERRIDE_PENDING
+  OVERRIDDEN
+  MANUAL_APPROVED
+}
+
+enum AttendanceSource {
+  MANAGER_MARKED
+  ENGINEER_CHECKIN
+}
+
+enum TicketState {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum ServiceType {
+  REPAIR
+  CHANGE
+}
+
+enum ChangeType {
+  HARDWARE
+  SOFTWARE
+}
+
+enum SmrState {
+  REQUESTED
+  ASSIGNED_TO_ENGINEER
+  APPROVED_BY_ENGINEER
+  APPROVED_BY_MANAGER
+  REJECTED
+  SYNCED_TO_ERP
+}
+
+enum SmrSource {
+  ZENDESK_ZAF
+  MANAGER_DIRECT
+  ENGINEER_REQUEST
+}
+
+enum ErpStatus {
+  DRAFT
+  APPROVED
+  DELIVERED
+}
+
+enum ChangeRecordType {
+  BOT_LEVEL
+  CUSTOMER_LEVEL
+}
+
+enum ChangeHistoryStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model User {
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String
+  email              String   @unique
+  passwordHash       String   @map("password_hash")
+  roles              Role[]
+  managerId          String?  @map("manager_id") @db.Uuid
+  defaultLandingPage String?  @map("default_landing_page")
+  pageAccess         Json?    @map("page_access")
+  isLocked           Boolean  @default(false) @map("is_locked")
+  isDeleted          Boolean  @default(false) @map("is_deleted")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  manager   User?  @relation("ManagerEngineers", fields: [managerId], references: [id])
+  engineers User[] @relation("ManagerEngineers")
+
+  // Attendance
+  attendanceRecords AttendanceRecord[] @relation("EngineerAttendance")
+
+  // Tickets
+  managedTickets  Ticket[] @relation("ManagerTickets")
+  assignedTickets Ticket[] @relation("EngineerTickets")
+
+  // SMR
+  requestedSmrs       SmrRequest[] @relation("SmrRequester")
+  managedSmrs         SmrRequest[] @relation("SmrManager")
+  assignedSmrs        SmrRequest[] @relation("SmrEngineer")
+
+  // Change History
+  changeHistories AmrChangeHistory[] @relation("EngineerChangeHistory")
+
+  // Audit
+  auditLogs AuditLog[] @relation("UserAuditLogs")
+
+  @@map("users")
+}
+
+model Site {
+  id           String  @id @default(uuid()) @db.Uuid
+  name         String
+  customerName String  @map("customer_name")
+  latitude     Float
+  longitude    Float
+  radiusMeters Int     @map("radius_meters")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  attendanceRecords AttendanceRecord[]
+  tickets           Ticket[]
+  smrRequests       SmrRequest[]
+  bots              Bot[]
+  changeHistories   AmrChangeHistory[]
+
+  @@map("sites")
+}
+
+model AttendanceRecord {
+  id             String           @id @default(uuid()) @db.Uuid
+  engineerId     String           @map("engineer_id") @db.Uuid
+  siteId         String           @map("site_id") @db.Uuid
+  attendanceDate DateTime         @map("attendance_date") @db.Date
+  state          AttendanceState
+  checkInTime    DateTime?        @map("check_in_time")
+  checkOutTime   DateTime?        @map("check_out_time")
+  checkInLat     Float?           @map("check_in_lat")
+  checkInLng     Float?           @map("check_in_lng")
+  checkOutLat    Float?           @map("check_out_lat")
+  checkOutLng    Float?           @map("check_out_lng")
+  source         AttendanceSource
+  version        Int              @default(1)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  engineer User @relation("EngineerAttendance", fields: [engineerId], references: [id])
+  site     Site @relation(fields: [siteId], references: [id])
+
+  @@unique([engineerId, attendanceDate])
+  @@map("attendance_records")
+}
+
+model Ticket {
+  id                   String      @id @default(uuid()) @db.Uuid
+  ticketNumber         Int         @unique @default(autoincrement()) @map("ticket_number")
+  state                TicketState @default(PENDING)
+  managerId            String      @map("manager_id") @db.Uuid
+  assignedEngineerId   String?     @map("assigned_engineer_id") @db.Uuid
+  customerName         String      @map("customer_name")
+  customerLocation     String      @map("customer_location")
+  siteId               String      @map("site_id") @db.Uuid
+  botNumber            String?     @map("bot_number")
+  zendeskTicketId      String?     @map("zendesk_ticket_id")
+  serviceType          ServiceType @map("service_type")
+  changeType           ChangeType  @map("change_type")
+  changeSubtype        String      @map("change_subtype")
+  startDate            DateTime    @map("start_date") @db.Date
+  endDate              DateTime    @map("end_date") @db.Date
+  actualCompletionDate DateTime?   @map("actual_completion_date") @db.Date
+  rejectionHistory     Json?       @map("rejection_history") @db.JsonB
+  images               Json?       @db.JsonB
+  engineerFormData     Json?       @map("engineer_form_data") @db.JsonB
+  notes                String?
+  daysTaken            Int?        @map("days_taken")
+  version              Int         @default(1)
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+
+  manager          User              @relation("ManagerTickets", fields: [managerId], references: [id])
+  assignedEngineer User?             @relation("EngineerTickets", fields: [assignedEngineerId], references: [id])
+  site             Site              @relation(fields: [siteId], references: [id])
+  smrRequests      SmrRequest[]
+  changeHistories  AmrChangeHistory[]
+
+  @@map("tickets")
+}
+
+model SmrRequest {
+  id                 String    @id @default(uuid()) @db.Uuid
+  state              SmrState  @default(REQUESTED)
+  source             SmrSource
+  ticketId           String?   @map("ticket_id") @db.Uuid
+  requestedBy        String    @map("requested_by") @db.Uuid
+  managerId          String    @map("manager_id") @db.Uuid
+  assignedEngineerId String?   @map("assigned_engineer_id") @db.Uuid
+  items              Json      @db.JsonB
+  customerName       String    @map("customer_name")
+  siteId             String    @map("site_id") @db.Uuid
+  rejectionReason    String?   @map("rejection_reason")
+  idempotencyKey     String?   @unique @map("idempotency_key")
+  erpId              String?   @map("erp_id")
+  erpStatus          ErpStatus? @map("erp_status")
+  version            Int       @default(1)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  ticket           Ticket?           @relation(fields: [ticketId], references: [id])
+  requester        User              @relation("SmrRequester", fields: [requestedBy], references: [id])
+  manager          User              @relation("SmrManager", fields: [managerId], references: [id])
+  assignedEngineer User?             @relation("SmrEngineer", fields: [assignedEngineerId], references: [id])
+  site             Site              @relation(fields: [siteId], references: [id])
+  changeHistories  AmrChangeHistory[]
+
+  @@map("smr_requests")
+}
+
+model Bot {
+  id        String  @id @default(uuid()) @db.Uuid
+  botNumber String  @map("bot_number")
+  siteId    String  @map("site_id") @db.Uuid
+  model     String?
+  isActive  Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  site            Site              @relation(fields: [siteId], references: [id])
+  changeHistories AmrChangeHistory[]
+
+  @@map("bots")
+}
+
+model AmrChangeHistory {
+  id              String              @id @default(uuid()) @db.Uuid
+  recordType      ChangeRecordType    @map("record_type")
+  siteId          String              @map("site_id") @db.Uuid
+  botId           String?             @map("bot_id") @db.Uuid
+  ticketId        String              @map("ticket_id") @db.Uuid
+  smrId           String?             @map("smr_id") @db.Uuid
+  zendeskTicketId String?             @map("zendesk_ticket_id")
+  engineerId      String              @map("engineer_id") @db.Uuid
+  changeType      ChangeType          @map("change_type")
+  serviceType     ServiceType         @map("service_type")
+  changeSubtype   String              @map("change_subtype")
+  status          ChangeHistoryStatus @default(PENDING)
+  date            DateTime            @db.Date
+  timeTakenDays   Int?                @map("time_taken_days")
+  smrDetails      Json?               @map("smr_details") @db.JsonB
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  site     Site        @relation(fields: [siteId], references: [id])
+  bot      Bot?        @relation(fields: [botId], references: [id])
+  ticket   Ticket      @relation(fields: [ticketId], references: [id])
+  smr      SmrRequest? @relation(fields: [smrId], references: [id])
+  engineer User        @relation("EngineerChangeHistory", fields: [engineerId], references: [id])
+
+  @@map("amr_change_history")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  oldState   String?  @map("old_state")
+  newState   String?  @map("new_state")
+  metadata   Json?    @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation("UserAuditLogs", fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model SystemConfig {
+  id    String @id @default(uuid()) @db.Uuid
+  key   String @unique
+  value String
+
+  @@map("system_config")
+}
